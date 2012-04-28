@@ -8,15 +8,19 @@ library(plyr)
 
 medians <- colwise(function (x) median(x, na.rm=T), is.numeric)(train);
 
-medians.by.hour <- ddply(train, .(hour), colwise(function (x) median(x, na.rm=T), is.numeric));
+preds <- lapply(c('hour', 'chunkID', 'month_most_common'), function (var) {
+  medians.by.var <- ddply(train, var, colwise(function (x) median(x, na.rm=T), is.numeric));
+  join(submit[,1:5], medians.by.var, by=var);
+});
 
 for (target in colnames(submit)[6:44]) {
   idxs <- which(submit[,target] > -999999);
-  hours <- submit$hour[idxs] + 1;
-  submit[idxs, target] <- medians.by.hour[hours, target]; 
+  submit[idxs, target] <- apply(sapply(preds, function (pred) pred[idxs,target]), 1, median);
 }
 
 argv <- commandArgs(T);
 filename <- argv[1];
+
+if (sum(is.na(submit)) > 0) stop('NAs detected');
 
 write.csv(submit, filename)
