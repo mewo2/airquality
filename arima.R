@@ -25,7 +25,7 @@ prediction <- function(data, varname) {
     target <- log(na.trim(data, 'left'));
     target <- na.spline(target, na.rm=F);
   
-    arma <- arima0(target, c(1,0,1), list(order=c(0,1,1), period=24));
+    arma <- arima0(target, c(1,0,1), list(order=c(0,0,0), period=24));
     pred <- as.vector(predict(arma, 72)$pred);
     if (any(abs(pred) > 10)) return(fallback);
     exp(pred);
