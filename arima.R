@@ -9,22 +9,30 @@ library(doMC);
 registerDoMC(4);
 
 rmedian <- function (x) median(x, na.rm=T);
+rmax <- function (x) max(x, na.rm=T);
+rmin <- function (x) min(x, na.rm=T);
 
 medians <- colwise(rmedian, is.numeric)(train);
+mins <- colwise(rmin, is.numeric)(train);
+maxes <- colwise(rmax, is.numeric)(train);
 
 prediction <- function(data, varname) {
   fallback <- rep(medians[[varname]], 72);
   if (sum(!is.na(data)) < 48) return(fallback);
   
   data[data <= 0] <- min(data[data > 0], na.rm=T);
-  return(tryCatch({
+  p <- tryCatch({
     target <- log(na.trim(data, 'left'));
     target <- na.spline(target, na.rm=F);
   
     arma <- arima0(target, c(1,0,1), list(order=c(0,1,1), period=24));
-    return(exp(as.vector(predict(arma, 72)$pred)));
-  }, error = function (e) {return(fallback)}));
-  
+    pred <- as.vector(predict(arma, 72)$pred);
+    if (any(abs(pred) > 10)) return(fallback);
+    exp(pred);
+  }, error = function (e) {return(fallback)});
+  p <- pmax(p, rmin(data), mins[[varname]], na.rm=T);
+  p <- pmin(p, rmax(data), maxes[[varname]], na.rm=T);
+  return(p);
 }
 
 pred <- ddply(train, .(chunkID), function (data) {
@@ -53,3 +61,4 @@ if (length(filename) == 0) {
 }
 write.csv(submit, filename);
 if (sum(is.na(submit)) > 0) stop('NAs detected');
+if (sum(submit[,-c(1:5)] > 1000) > 0) stop('Large values detected');
